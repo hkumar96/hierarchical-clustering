@@ -1,6 +1,7 @@
 from __future__ import print_function
 import csv
-from nltk.stem.porter import *
+import re
+from stemming.porter2 import stem
 import numpy as np
 
 def read_csv(filename="sms.csv"):
@@ -15,11 +16,10 @@ def remove_stopword(msg_list,stopwords):
         temp.append(msg)
     return temp
 
-def stem(msg_list):
-    stemmer = PorterStemmer()
+def stemmer(msg_list):
     temp = []
     for msg in msg_list:
-        msg = [stemmer.stem(word) for word in msg]
+        msg = [stem(word) for word in msg]
         temp.append(msg)
     return temp
 
@@ -91,7 +91,7 @@ def clustering(_sim,threshold):
     #     if h==1:
     #         for row1 in sim_temp:
     #             print(row1)
-    print clusters
+    print (clusters)
     print (level)
 
 
@@ -104,19 +104,19 @@ temp = read_csv("stopword.csv")
 for wrd in temp:
     stopwords.append(wrd[0])
 # print (stopwords)
-temp = read_csv("demo.csv")
+temp = read_csv("sms.csv")
 for sms in temp:
-    message_list.append(sms[2].split()) #tokenization not done properly
-
+    message_list.append(re.split(';|\ |,|\?|@|\*|$|\"|\n',sms[2]))
+# print (message_list)
 message_list = remove_stopword(message_list,stopwords)
-message_list = stem(message_list)
+message_list = stemmer(message_list)
 
 corpus = create_corpus(message_list)
 tf = update_tf(message_list,corpus)
 idf = update_idf(message_list,corpus)
 tf_idf = calc_tf_idf(tf,idf);
 sim = calc_similarity(tf_idf)
-clustering(sim,0.4)
+clustering(sim,0.9)
 # print (corpus)
 # print (idf)
 # print (tf_idf.shape)
