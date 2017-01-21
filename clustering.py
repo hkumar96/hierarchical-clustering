@@ -61,6 +61,42 @@ def calc_similarity(tf_idf):
             temp_sim[i,k] = 1.0*np.sum(np.dot(tf_idf[:,i],tf_idf[:,k]))/(norm_vec[i]*norm_vec[k])
     return np.array(temp_sim)
 
+def clustering(_sim,threshold):
+    labels = [lbl for lbl in range(_sim.shape[1])]
+    sim_temp = np.copy(_sim)
+    m=0
+    level ={}
+    max_sim = 0
+    level[m] = 1
+    clusters = labels
+    while True:
+        n = sim_temp.shape[1]
+        max_sim = 0
+        for i in range(n):
+            for j in range(i):
+                if max_sim < sim_temp[i,j]:
+                    max_sim= sim_temp[i,j]
+                    x,y=i,j
+        if max_sim < threshold:
+            break
+        m = m + 1
+        level[m] = max_sim
+        for row in sim_temp:
+            row[y] = max(row[y],row[x])
+        sim_temp[y,:] = sim_temp[:,y]
+        sim_temp=np.delete(sim_temp,x,0)
+        sim_temp=np.delete(sim_temp,x,1)
+        clusters[y] = (clusters[y],clusters.pop(x))
+        # print (clusters)
+    #     if h==1:
+    #         for row1 in sim_temp:
+    #             print(row1)
+    print clusters
+    print (level)
+
+
+
+
 stopwords =[]
 message_list = []
 
@@ -80,8 +116,8 @@ tf = update_tf(message_list,corpus)
 idf = update_idf(message_list,corpus)
 tf_idf = calc_tf_idf(tf,idf);
 sim = calc_similarity(tf_idf)
-
+clustering(sim,0.4)
 # print (corpus)
 # print (idf)
-print (tf_idf.shape)
-print(sim)
+# print (tf_idf.shape)
+# print(sim)
