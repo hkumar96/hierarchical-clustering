@@ -1,1 +1,3 @@
 # Hierarchical-clustering
+numpy
+nltk
