@@ -3,6 +3,7 @@ import csv
 import re
 from stemming.porter2 import stem
 import numpy as np
+import time
 
 def read_csv(filename="sms.csv"):
     with open(filename,'rb') as csvfile:
@@ -12,53 +13,55 @@ def read_csv(filename="sms.csv"):
 def remove_stopword(msg_list,stopwords):
     temp = []
     for msg in msg_list:
-        msg = [word for word in msg if word.lower() not in stopwords]
+        msg = " ".join([word for word in re.split(';|\ |,|\?|@|\*|$|\"|\n',msg) if word.lower() not in stopwords])
         temp.append(msg)
     return temp
 
 def stemmer(msg_list):
     temp = []
     for msg in msg_list:
-        msg = [stem(word) for word in msg]
+        msg = [stem(word) for word in msg.split()]
         temp.append(msg)
     return temp
 
 def create_corpus(msg_list):
-    temp_cp = []
-    for msg in msg_list:
+    temp_cp = {}
+    for i,msg in enumerate(msg_list):
         for word in msg:
             if word not in temp_cp:
-                temp_cp.append(word)
+                temp_cp[word] = {i}
+            else:
+                temp_cp[word].add(i)
     return temp_cp
 
-def update_tf(msg_list,corpus):
-    temp_tf = np.zeros(shape=(len(corpus),len(msg_list)))
-    for i in range(len(corpus)):
-        for j in range(len(msg_list)):
-            temp_tf[i][j] = msg_list[j].count(corpus[i])*1.0/len(msg_list[j])
-    return np.array(temp_tf)
+def ret_tf(msg_list,corpus,x,y):
+    if (len(msg_list[y]) == 0):
+        return 0
+    return (1.0*msg_list[y].count(corpus[x]) / len(msg_list[y]))
 
-def update_idf(msg_list,corpus):
-    temp_idf = np.zeros(len(corpus))
-    for i in range(len(corpus)):
-        matches = len([True for msg in msg_list if corpus[i] in msg])
-        temp_idf[i] = (np.log10(len(msg_list)*1.0 / (1 + matches)))
+def update_idf(msg_list,num_word):
+    temp_idf = np.zeros(len(num_word))
+    for i in range(len(num_word)):
+        temp_idf[i] = (np.log10(len(msg_list)*1.0 / (1 + num_word[i])))
     return np.array(temp_idf)
 
-def calc_tf_idf(tf,idf):
-    temp_tf_idf = np.zeros(tf.shape)
-    for i in range(tf.shape[0]):
-        for j in range(tf.shape[1]):
-            temp_tf_idf[i][j] = tf[i][j]*idf[i]
-    return np.array(temp_tf_idf)
+def calc_tf_idf(msg_list,corpus,idf):
+    temp_tf_idf = []
+    for i in range(len(corpus)):
+        temp_tf_idf.append([ret_tf(msg_list,corpus,i,j)*idf[i] for j in range(len(msg_list))])
+    return temp_tf_idf
 
 def calc_similarity(tf_idf):
-    msg_num = tf_idf.shape[1]
+    msg_num = len(tf_idf[0])
+    tf_idf = np.array(tf_idf)
     temp_sim = np.zeros([msg_num,msg_num])
-    norm_vec = np.linalg.norm(tf_idf,axis=0)
-    for i in range(msg_num):
-        for k in range(msg_num):
-            temp_sim[i,k] = 1.0*np.sum(np.dot(tf_idf[:,i],tf_idf[:,k]))/(norm_vec[i]*norm_vec[k])
+    temp_sim = np.dot(tf_idf.T,tf_idf)
+    norm_vec = np.diag(temp_sim)
+    inv_norm = 1 / norm_vec
+    inv_norm[np.isinf(inv_norm)] = 0
+    inv_norm = np.sqrt(inv_norm)
+    temp_sim = temp_sim*inv_norm
+    temp_sim = temp_sim.T*inv_norm
     return np.array(temp_sim)
 
 def clustering(_sim,threshold):
@@ -87,37 +90,37 @@ def clustering(_sim,threshold):
         sim_temp=np.delete(sim_temp,x,0)
         sim_temp=np.delete(sim_temp,x,1)
         clusters[y] = (clusters[y],clusters.pop(x))
-        # print (clusters)
-    #     if h==1:
-    #         for row1 in sim_temp:
-    #             print(row1)
     print (clusters)
-    print (level)
+    # print (level)
 
 
 
-
+start_time = time.time()
 stopwords =[]
 message_list = []
 
 temp = read_csv("stopword.csv")
 for wrd in temp:
     stopwords.append(wrd[0])
-# print (stopwords)
-temp = read_csv("sms.csv")
+
+temp = read_csv("demo.csv")
 for sms in temp:
-    message_list.append(re.split(';|\ |,|\?|@|\*|$|\"|\n',sms[2]))
-# print (message_list)
+    message_list.append(sms[2])
+
 message_list = remove_stopword(message_list,stopwords)
 message_list = stemmer(message_list)
 
-corpus = create_corpus(message_list)
-tf = update_tf(message_list,corpus)
-idf = update_idf(message_list,corpus)
-tf_idf = calc_tf_idf(tf,idf);
+
+access = create_corpus(message_list)
+corpus = []
+num_word = []
+for key in access:
+    corpus.append(key)
+    num_word.append(len(access[key]))
+
+idf = update_idf(message_list,num_word)
+tf_idf = calc_tf_idf(message_list,corpus,idf);
 sim = calc_similarity(tf_idf)
-clustering(sim,0.9)
-# print (corpus)
-# print (idf)
-# print (tf_idf.shape)
-# print(sim)
+clustering(sim,0.7)
+
+print("--- %s seconds ---" % (time.time() - start_time))
